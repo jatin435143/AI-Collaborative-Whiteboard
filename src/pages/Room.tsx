@@ -1,51 +1,52 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 
-import Whiteboard from "../components/Whiteboard";
 import Toolbar from "../components/Toolbar";
+import Whiteboard from "../components/Whiteboard";
+import UserList from "../components/UserList";
+
 import { getSocket } from "../services/socket";
+import type { User } from "../types/User";
 
 export default function Room() {
   const { roomId } = useParams();
+
+  const [users, setUsers] = useState<User[]>([]);
 
   useEffect(() => {
     if (!roomId) return;
 
     const socket = getSocket();
 
-    // Function to join the room
     const joinRoom = () => {
-      console.log("✅ Connected:", socket.id);
+      const username =
+        localStorage.getItem("username") || "Anonymous";
 
-      socket.emit("join-room", roomId);
-
-      socket.emit("ping-test", "Hello from " + socket.id);
+      socket.emit("join-room", {
+        roomId,
+        name: username,
+      });
     };
 
-    // Listen for connection
+    const handleUsersUpdated = (users: User[]) => {
+      console.log(users);
+
+      setUsers(users);
+    };
+
     socket.on("connect", joinRoom);
 
-    // If already connected, join immediately
+    socket.on("users-updated", handleUsersUpdated);
+
     if (socket.connected) {
       joinRoom();
     } else {
       socket.connect();
     }
 
-    // Listen for ping messages
-    const handlePing = (msg: string) => {
-      console.log("📩", msg);
-    };
-
-    socket.on("ping-test", handlePing);
-
     return () => {
       socket.off("connect", joinRoom);
-      socket.off("ping-test", handlePing);
-
-      // IMPORTANT:
-      // Do NOT disconnect the socket here.
-      // We want the socket to stay alive while the app is running.
+      socket.off("users-updated", handleUsersUpdated);
     };
   }, [roomId]);
 
@@ -59,8 +60,21 @@ export default function Room() {
     >
       <Toolbar roomId={roomId || ""} />
 
-      <div style={{ flex: 1 }}>
-        <Whiteboard roomId={roomId || ""} />
+      <div
+        style={{
+          flex: 1,
+          display: "flex",
+        }}
+      >
+        <div
+          style={{
+            flex: 1,
+          }}
+        >
+          <Whiteboard roomId={roomId || ""} />
+        </div>
+
+        <UserList users={users} />
       </div>
     </div>
   );

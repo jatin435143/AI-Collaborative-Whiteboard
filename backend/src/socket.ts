@@ -1,6 +1,15 @@
 import { Server } from "socket.io";
 import type { Server as HttpServer } from "http";
 
+const rooms = new Map<
+  string,
+  {
+    id: string;
+    name: string;
+    color: string;
+  }[]
+>();
+
 export function initSocket(httpServer: HttpServer) {
   const io = new Server(httpServer, {
     cors: {
@@ -24,16 +33,39 @@ export function initSocket(httpServer: HttpServer) {
     // ==========================
     // Join Room
     // ==========================
-    socket.on("join-room", (roomId: string) => {
-      socket.join(roomId);
-
-      // Save room id for later use
-      socket.data.roomId = roomId;
-
-      console.log(`✅ ${socket.id} joined room ${roomId}`);
-
-      socket.emit("joined-room", roomId);
-    });
+    socket.on(
+      "join-room",
+      ({ roomId, name }: { roomId: string; name: string }) => {
+        socket.join(roomId);
+    
+        socket.data.roomId = roomId;
+    
+        const COLORS = [
+          "#ef4444",
+          "#3b82f6",
+          "#10b981",
+          "#f59e0b",
+          "#8b5cf6",
+          "#ec4899",
+        ];
+    
+        const roomUsers = rooms.get(roomId) || [];
+    
+        const newUser = {
+          id: socket.id,
+          name,
+          color: COLORS[roomUsers.length % COLORS.length],
+        };
+    
+        roomUsers.push(newUser);
+    
+        rooms.set(roomId, roomUsers);
+    
+        console.log(`${name} joined ${roomId}`);
+    
+        io.to(roomId).emit("users-updated", roomUsers);
+      }
+    );
 
     // ==========================
     // Whiteboard Updates
@@ -67,9 +99,22 @@ export function initSocket(httpServer: HttpServer) {
     // ==========================
     // Disconnect
     // ==========================
-    socket.on("disconnect", (reason) => {
-      console.log(`❌ ${socket.id} disconnected`);
-      console.log("Reason:", reason);
+    socket.on("disconnect", () => {
+      const roomId = socket.data.roomId;
+    
+      if (roomId) {
+        const users = rooms.get(roomId) || [];
+    
+        const updatedUsers = users.filter(
+          (user) => user.id !== socket.id
+        );
+    
+        rooms.set(roomId, updatedUsers);
+    
+        io.to(roomId).emit("users-updated", updatedUsers);
+      }
+    
+      console.log(`${socket.id} disconnected`);
     });
 
     socket.on("ping-test", (message: string) => {
