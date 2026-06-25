@@ -12,7 +12,7 @@ dotenv.config();
 const PORT = process.env.PORT ?? 3001;
 
 async function start() {
-  // await connectDB();
+  await connectDB();
 
   const httpServer = createServer(app);
   initSocket(httpServer);
