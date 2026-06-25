@@ -1,6 +1,17 @@
 import { Server } from "socket.io";
 import type { Server as HttpServer } from "http";
 
+const cursors = new Map<
+  string,
+  {
+    id: string;
+    name: string;
+    color: string;
+    x: number;
+    y: number;
+  }
+>();
+
 const rooms = new Map<
   string,
   {
@@ -88,11 +99,29 @@ export function initSocket(httpServer: HttpServer) {
     // ==========================
     // Cursor Movement (Future)
     // ==========================
-    socket.on("cursor-move", (cursor) => {
+    socket.on("cursor-move", ({ x, y }) => {
       const roomId = socket.data.roomId;
-
+    
       if (!roomId) return;
-
+    
+      const users = rooms.get(roomId);
+    
+      if (!users) return;
+    
+      const currentUser = users.find((u) => u.id === socket.id);
+    
+      if (!currentUser) return;
+    
+      const cursor = {
+        id: socket.id,
+        name: currentUser.name,
+        color: currentUser.color,
+        x,
+        y,
+      };
+    
+      cursors.set(socket.id, cursor);
+    
       socket.to(roomId).emit("cursor-move", cursor);
     });
 
